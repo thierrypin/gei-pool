@@ -1,0 +1,26 @@
+
+{
+    "description": "Recogna's research model templates",
+    "saved_model": {"default":null, "type":"str", "help":"Saved model location"},
+
+    "train_list": {"default":"OULP/CV01.txt_gallery_55", "type":"str", "help":"Path to list of training samples"},
+    "val_list": {"default":"OULP/CV01.txt_probe_55", "type":"str", "help":"Path to list of validation samples"},
+    "test_list": {"default":"OULP/CV01.txt_full_55", "type":"str", "help":"Path to list of testing samples"},
+    "nb_frames": {"default":4, "type":"int", "help":"Number of frames on the time series"},
+    "eager": {"default":"true", "type":"str2bool", "help":"If set, load all samples into memory"},
+    "encoder": {"default":"onehot", "type":"str", "help":"Label encoding method"},
+
+    "train_all": {"default":"false", "type":"str2bool", "help":"If true, unlock all layers for training"},
+
+    "model": {"default":"lstm", "type":"str", "help":"Model name"},
+    "batch_size": {"default":239, "type":"int", "help":"Training batch size"},
+    "nb_epochs": {"default":50, "type":"int", "help":"Number of epochs"},
+    "augment": {"default":"true", "type":"str2bool", "help":"Perform data augmentation"},
+    
+    "optimizer": {"default":"sgd", "type":"str", "help":"Optimizer"},
+    "loss_function": {"default":"categorical_crossentropy", "type":"str", "help":"Loss function"},
+    "max_lr": {"default":"0.02", "type":"float", "help":"Initial learning rate"},
+    "min_lr": {"default":"1e-5", "type":"float", "help":"Minimum learning rate"},
+    "lr_momentum": {"default":"0.9", "type":"float", "help":"Learning rate momentum"}
+}
+
