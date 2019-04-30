@@ -49,7 +49,7 @@ class HistoryKeeper():
         self.csv_path = os.path.join(logdir, 'history.csv')
 
         with open(self.csv_path, 'w') as f:
-            f.write(";".join(keys))
+            f.write(";".join(keys) + "\n")
     
     # Return True to interrupt training
     def __call__(self, model, params):
@@ -61,7 +61,7 @@ class HistoryKeeper():
                 pars_.append(str(params[key]))
 
         with open(self.csv_path, 'a') as f:
-            f.write(";".join(pars_))
+            f.write(";".join(pars_) + "\n")
 
 
 class EarlyStopper():

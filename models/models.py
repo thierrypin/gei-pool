@@ -70,17 +70,17 @@ class ResearchModels():
 
     def geinet(self):
 
-        net = nn.HybridSequential()
+        net = nn.HybridSequential(prefix='gei_')
         with net.name_scope():
-            net.add(nn.Conv2D(18, (7, 7)))
+            net.add(nn.Conv2D(18, (7, 7), activation='relu'))
             net.add(nn.MaxPool2D(pool_size=(2, 2), strides=(2, 2)))
             net.add(LRN())
 
-            net.add(nn.Conv2D(45, (5 ,5)))
+            net.add(nn.Conv2D(45, (5 ,5), activation='relu'))
             net.add(nn.MaxPool2D(pool_size=(3, 3), strides=(2, 2)))
             net.add(LRN())
 
-            net.add(nn.Dense(1024))
+            net.add(nn.Dense(1024, activation='relu', prefix='feature_'))
             net.add(nn.Dropout(0.3))
 
             net.add(nn.Dense(self.nb_classes))
@@ -89,15 +89,15 @@ class ResearchModels():
     
     def no_pool_geinet(self):
 
-        net = nn.HybridSequential()
+        net = nn.HybridSequential(prefix='gei_')
         with net.name_scope():
-            net.add(nn.Conv2D(18, (7, 7), strides=(2, 2)))
+            net.add(nn.Conv2D(18, (7, 7), strides=(2, 2), activation='relu'))
             net.add(LRN())
 
-            net.add(nn.Conv2D(45, (5, 5), strides=(2, 2)))
+            net.add(nn.Conv2D(45, (5, 5), strides=(2, 2), activation='relu'))
             net.add(LRN())
 
-            net.add(nn.Dense(1024))
+            net.add(nn.Dense(1024, activation='relu', prefix='feature_'))
             net.add(nn.Dropout(0.3))
 
             net.add(nn.Dense(self.nb_classes))
@@ -106,17 +106,43 @@ class ResearchModels():
 
     def no_pool(self):
 
-        net = nn.HybridSequential()
+        net = nn.HybridSequential(prefix='gei_')
         with net.name_scope():
-            net.add(nn.Conv2D(18, (7, 7), input_size=self.input_shape))
-            net.add(nn.Conv2D(18, (7, 7), strides=(2, 2)))
+            net.add(nn.Conv2D(18, (7, 7), activation='relu'))
+            net.add(nn.Conv2D(18, (7, 7), strides=(2, 2), activation='relu'))
             net.add(LRN())
 
-            net.add(nn.Conv2D(45, (5 ,5)))
-            net.add(nn.Conv2D(45, (5, 5), strides=(2, 2)))
+            net.add(nn.Conv2D(45, (5 ,5), activation='relu'))
+            net.add(nn.Conv2D(45, (5, 5), strides=(2, 2), activation='relu'))
             net.add(LRN())
 
-            net.add(nn.Dense(1024))
+            net.add(nn.Dense(1024, activation='relu', prefix='feature_'))
+            net.add(nn.Dropout(0.3))
+
+            net.add(nn.Dense(self.nb_classes))
+
+        return net
+
+    def no_pool_big(self):
+
+        net = nn.HybridSequential(prefix='gei_')
+        with net.name_scope():
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
+            net.add(LRN())
+
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
+            net.add(LRN())
+
+            net.add(nn.Conv2D(128, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(128, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(128, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
+            net.add(LRN())
+
+            net.add(nn.Dense(1024, activation='relu', prefix='feature_'))
             net.add(nn.Dropout(0.3))
 
             net.add(nn.Dense(self.nb_classes))

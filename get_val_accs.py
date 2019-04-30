@@ -17,9 +17,7 @@ def parse_args():
     return parser.parse_args()
 
 
-
-
-def delete_empty(folder):
+def val_accs(folder):
     regex = re.compile(r'(?:acc)(?P<acc>\d\.\d{3})(?:\.hdf5-symbol)')
     lst = glob(os.path.join(folder, "*/"))
     accs = {}
@@ -47,13 +45,9 @@ def delete_empty(folder):
 
 
 
-
-
-
-
 def main():
     args = parse_args()
-    delete_empty(args.folder)
+    val_accs(args.folder)
     #
 
 

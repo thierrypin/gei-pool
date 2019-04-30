@@ -5,10 +5,11 @@
 
     "train_list": {"default":"OULP/CV01.txt_gallery_55", "type":"str", "help":"Path to list of training samples"},
     "val_list": {"default":"OULP/CV01.txt_probe_55", "type":"str", "help":"Path to list of validation samples"},
-    "test_list": {"default":"OULP/CV01.txt_full_55", "type":"str", "help":"Path to list of testing samples"},
+    "gallery_list": {"default":"OULP/CV02.txt_gallery_55", "type":"str", "help":"Path to list of testing gallery samples"},
+    "probe_list": {"default":"OULP/CV02.txt_probe_55", "type":"str", "help":"Path to list of testing probe samples"},
     "nb_frames": {"default":4, "type":"int", "help":"Number of frames on the time series"},
     "eager": {"default":"true", "type":"str2bool", "help":"If set, load all samples into memory"},
-    "encoder": {"default":"onehot", "type":"str", "help":"Label encoding method"},
+    "ckpt_folder": {"default":null, "type":"str", "help":"Checkpoint folder"},
 
     "train_all": {"default":"false", "type":"str2bool", "help":"If true, unlock all layers for training"},
 

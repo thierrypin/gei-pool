@@ -1,15 +1,22 @@
+#!/bin/bash
 
-for opt in sgd # nadam adam
+
+for i in {1..10}
 do
-    for model in gru_ gru256 gru1024
+    export fold=`printf "%02d" $i`
+    for angle in 55 65 75 85
     do
-        for lr in 0.001 0.0001
-        do
+        for model in geinet no_pool_geinet no_pool
+        do  
+            export exp="$fold-$angle"
             echo "******************************"
-            echo "$opt, $model, $lr"
+            echo "$fold, $model, $angle"
             echo "******************************"
-            python train_lstm.py --exp "$opt-$lr" --batch_size 16 --model $model --train_list CASIAB/features_mobilenet/list_train --val_list CASIAB/features_mobilenet/list_val --optimizer $opt --max_lr $lr --nb_epochs 30
+            python train.py --exp $exp --model $model --train_list OULP/CV$fold.txt_gallery_$angle --val_list OULP/CV$fold.txt_probe_$angle
         done
     done
 done
+
+
+
 

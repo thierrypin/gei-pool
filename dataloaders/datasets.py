@@ -30,14 +30,14 @@ def preprocess(samples):
 
 # Generic Numpy .npy loader
 class ArrayData(Dataset):
-    def __init__(self, list_path, nb_frames=4, augmenter=None, eager=False, encoder=None):
+    def __init__(self, list_path, nb_frames=4, augmenter=None, eager=False, encoder=None, testing=False):
         self.eager = eager
         self.nb_frames = nb_frames
 
         ###
         # Specific part
         self.augmenter = augmenter
-
+        self.testing = testing
         self.files = np.loadtxt(list_path, delimiter=';', dtype=str)
         
         ###
@@ -87,12 +87,18 @@ class ArrayData(Dataset):
         return len(self.data)
 
     def lazy_getter(self, idx):
+        if self.testing:
+            return np.load(self.data[idx]), self.ground_truth[idx]
+
         gei_img = self.gei(np.load(self.data[idx]))
         ground_truth = self.ground_truth[idx]
 
         return nd.array(gei_img), ground_truth
 
     def eager_getter(self, idx):
+        if self.testing:
+            return self.data[idx], self.ground_truth[idx]
+
         gei_img = self.gei(self.data[idx])
         ground_truth = self.ground_truth[idx]
         

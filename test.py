@@ -4,6 +4,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import os
+import re
 import sys
 import math
 from tqdm import tqdm
@@ -15,11 +16,16 @@ from utils.fs import mkdir_p
 
 import mxnet as mx
 from mxnet import nd
-from mxnet.gluon import nn
-from mxnet.gluon.data import DataLoader
 
 import numpy as np
-import pickle
+
+from collections import namedtuple
+Batch = namedtuple('Batch', ['data'])
+
+from pyopf import OPFClassifier
+from sklearn.neighbors import KNeighborsClassifier
+
+from sklearn.metrics import accuracy_score
 
 class CasiabEncoder:
     def transform(self, labels):
@@ -35,11 +41,25 @@ def accuracy(output, label):
     print(output.argmax(axis=1), label, output.argmax(axis=1) == label.astype('float32'))
     # return (output.argmax(axis=1) == label).mean().asscalar()
 
-def main(test_list, exp, saved_model, batch_size, encoder, nb_frames, eager, video, params=None, **kwargs):
+def gei(video):
+    tmp = video.astype(np.float32) / 255.
+    return tmp.mean(axis=0)[np.newaxis , ...]
+
+def batchify(video, gei_size=4):
+    nb_frames = video.shape[0]
+    
+    batch = []
+    for i in range(0, nb_frames, gei_size):
+        batch.append(gei(video[i:i+gei_size]))
+    
+    return np.array(batch) # expand_dims axis=1
+
+
+def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eager, params=None, **kwargs):
 
     print("Unused arguments:", kwargs)
 
-    setname = test_list.split(os.sep)[0]
+    setname = gallery_list.split(os.sep)[0]
     # Timestamp to name experiment folder
     xptime = strftime("%Y-%m-%d_%Hh%Mm%Ss", gmtime())
     xp_folder = "tests/%s-%s_%s" % (setname, exp, xptime)
@@ -59,65 +79,135 @@ def main(test_list, exp, saved_model, batch_size, encoder, nb_frames, eager, vid
     #############################
     #          Loading          #
     #############################
-
-    # Label encoder
-    split = saved_model.split(os.sep)
-    enc_path = os.sep.join(split[:split.index('checkpoints')])
-    try:
-        with open(os.path.join(enc_path, 'encoder.pkl'), 'rb') as f:
-            encoder = pickle.load(train_data.get_encoder(), f)
-    except:
-        encoder = CasiabEncoder()
-    print(encoder)
     
     # Dataset classes
-    test_data = ArrayData(test_list, nb_frames=nb_frames, augmenter=None, eager=eager, video=video, encoder=encoder)
+    gallery_data = ArrayData(gallery_list, nb_frames=nb_frames, augmenter=None, eager=eager, testing=True)
+    print("Gallery size", gallery_data[0][0].shape)
+    nb_gallery = len(gallery_data) # loader should provide the number of sampĺes
 
-    # Train loader
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, last_batch='keep', num_workers=6)
-    nb_samples = len(test_data) # loader should provide the number of sampĺes
+    probe_data = ArrayData(probe_list, nb_frames=nb_frames, augmenter=None, eager=eager, encoder=gallery_data.get_encoder(), testing=True)
+    print("Probe size", probe_data[0][0].shape)
+    nb_probe = len(probe_data) # loader should provide the number of sampĺes
 
-    # Compute number of steps
-    steps = math.ceil(nb_samples / batch_size)
+    # Find the best model
+    regex = re.compile(r'hdf5-(?P<epoch>\d{4}).params')
+    epoch = 0
+    model_path = None
+    for p in os.listdir(ckpt_folder):
+        m = regex.search(p)
+        if m:
+            e = int(m.group('epoch'))
+            if epoch < e:
+                epoch = e
+                model_path = p[:-12]
+    
+    print("Model path", model_path)
 
-    # The model
-    symbols = saved_model[:-11] + "symbol.json"
-    net = nn.SymbolBlock.imports(symbols, ['data'], saved_model, ctx=mx.gpu())
+    # Loading complete model and its weights
+    sym, arg_params, aux_params = mx.model.load_checkpoint(model_path, epoch)
+    all_layers = sym.get_internals() # feature layer
+
+    # Get the feature layer output
+    out_list = all_layers.list_outputs()[-10:]
+    layername = None
+    for out in out_list:
+        if 'feature_relu_fwd_output' in out:
+            layername = out
+            break
+
+    # Feature extraction network
+    sym3 = all_layers[layername]
+    model = mx.mod.Module(symbol=sym3, label_names=None, context=mx.gpu())
+    model.bind(for_training=False, data_shapes=[('data', (1,1,64,44))])
+    model.set_params(arg_params, aux_params)
+
 
     # A little more verbosity
     print("************************************")
-    print("Batch size:", batch_size)
-    print(nb_samples, "testing samples,", steps, "steps")
+    print(nb_gallery, "gallery samples,")
+    print(nb_probe, "probe samples,")
     print("************************************")
 
 
     ###########
     # Testing #
     ###########
-    progress_desc = "Acc %.3f        "
     start_time = time()
 
-    gts = []
-    outs = []
+    train_data = []
+    train_labels = []
     # calculate testing accuracy
-    prog = tqdm(test_loader, desc='Running test', unit='batch')
-    for data, label in prog:
-        data = data.copyto(mx.gpu(0))
-        label = label.copyto(mx.gpu(0))
+    for i in tqdm(range(nb_gallery), desc='Computing gallery features'):
+        video, label = gallery_data[i]
+
+        # Split video in clips and build their GEIs
+        data = batchify(video)
+        data = nd.array(data, ctx=mx.gpu(0))
+
+        # They all have the same label
+        nb_gei = data.shape[0]
+        label = np.repeat(label, nb_gei)
 
         # Compute outputs and accuracy
-        output = net(data)
-        preds = output.softmax().argmax(axis=1)
+        model.forward(Batch([data]))
+        preds = model.get_outputs()[0].asnumpy()
 
-        gts.append(label.copyto(mx.cpu()).asnumpy()[..., 0])
-        outs.append(preds.copyto(mx.cpu()).asnumpy())
+        train_data.append(preds)
+        train_labels.append(label)
 
-    gts = np.hstack(gts)
-    outs = np.hstack(outs)
-    print(gts.shape, outs.shape)
+    train_data = np.vstack(train_data)
+    train_labels = np.hstack(train_labels)
 
-    acc = (gts == outs).mean()
-    print("Accuracy:", acc)
+    print("train_size", train_data.shape, train_labels.shape)
+
+    test_data = []
+    test_labels = []
+    # calculate testing accuracy
+    for i in tqdm(range(nb_probe), desc='Computing probe features'):
+        video, label = probe_data[i]
+
+        # Split video in clips and build their GEIs
+        data = batchify(video)
+        data = nd.array(data, ctx=mx.gpu(0))
+
+        # They all have the same label
+        nb_gei = data.shape[0]
+        label = np.repeat(label, nb_gei)
+
+        # Compute outputs and accuracy
+        model.forward(Batch([data]))
+        preds = model.get_outputs()[0].asnumpy()
+
+        test_data.append(preds)
+        test_labels.append(label)
+
+    test_data = np.vstack(test_data)
+    test_labels = np.hstack(test_labels)
+
+    print("test_size", test_data.shape, test_labels.shape)
+
+    print()
+    nn_start = time()
+    nn = KNeighborsClassifier(1)
+    nn.fit(train_data, train_labels)
+    nn_fit = time()
+    preds = nn.predict(test_data)
+    nn_end = time()
+
+    nn_acc = accuracy_score(preds, test_labels)
+    print("NN accuracy:", nn_acc)
+    print("nn train", nn_fit - nn_start, ", nn_test", nn_end - nn_fit)
+
+    opf_start = time()
+    opf = OPFClassifier()
+    opf.fit(train_data, train_labels)
+    opf_fit = time()
+    preds = opf.predict(test_data)
+    opf_end = time()
+
+    opf_acc = accuracy_score(preds, test_labels)
+    print("OPF accuracy:", opf_acc)
+    print("opf train", opf_fit - opf_start, ", opf_test", opf_end - opf_fit)
 
     hours, rem = divmod(time()-start_time, 3600)
     days, hours = divmod(hours, 24)

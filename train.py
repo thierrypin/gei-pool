@@ -31,7 +31,7 @@ def accuracy(output, label):
     print(output.argmax(axis=1), label, output.argmax(axis=1) == label.astype('float32'))
     # return (output.argmax(axis=1) == label).mean().asscalar()
 
-def main(train_list, val_list, model, exp, saved_model, batch_size, optimizer, nb_epochs, augment, max_lr, min_lr, loss_function, train_all, encoder, nb_frames, eager, params=None, **kwargs):
+def main(train_list, val_list, model, exp, saved_model, batch_size, optimizer, nb_epochs, augment, max_lr, min_lr, loss_function, train_all, nb_frames, eager, params=None, **kwargs):
 
     print("Unused arguments:", kwargs)
 
