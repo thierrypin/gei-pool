@@ -186,6 +186,10 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
 
     print("test_size", test_data.shape, test_labels.shape)
 
+
+    ##############################
+    # Fazer a moda das predições #
+    ##############################
     print()
     nn_start = time()
     nn = KNeighborsClassifier(1)
