@@ -12,6 +12,7 @@ do
             echo "******************************"
             echo "$fold, $model, $angle"
             echo "******************************"
+            # --exp just appends a string to the output folder name
             python train.py --exp $exp --model $model --train_list OULP/CV$fold.txt_gallery_$angle --val_list OULP/CV$fold.txt_probe_$angle
         done
     done
