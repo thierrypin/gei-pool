@@ -17,15 +17,15 @@ from utils.fs import mkdir_p
 import mxnet as mx
 from mxnet import nd
 
-import numpy as np
-
 from collections import namedtuple
 Batch = namedtuple('Batch', ['data'])
 
+import numpy as np
+
 from pyopf import OPFClassifier
 from sklearn.neighbors import KNeighborsClassifier
-
 from sklearn.metrics import accuracy_score
+from scipy.stats import mode
 
 class CasiabEncoder:
     def transform(self, labels):
@@ -55,14 +55,23 @@ def batchify(video, gei_size=4):
     return np.array(batch) # expand_dims axis=1
 
 
-def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eager, params=None, **kwargs):
+def main(dest_fold, dest_angle, ckpt_folder, nb_frames, eager, params=None, **kwargs):
 
     print("Unused arguments:", kwargs)
 
-    setname = gallery_list.split(os.sep)[0]
-    # Timestamp to name experiment folder
-    xptime = strftime("%Y-%m-%d_%Hh%Mm%Ss", gmtime())
-    xp_folder = "tests/%s-%s_%s" % (setname, exp, xptime)
+    # Find information about the model
+    expr = r"(?P<set>\w+)-(?P<model>[\w_]+)-(?P<fold>\d{2})-(?P<angle>\d{2})"
+    m = re.search(expr, ckpt_folder)
+    if m:
+        setname = m.group('set')
+        modelname = m.group('model')
+        fold = m.group('fold')
+        angle = m.group('angle')
+
+    # setname = gallery_list.split(os.sep)[0]
+
+    # Output folder
+    xp_folder = "tests/%s-%s_%s>%s_%s>%s" % (setname, modelname, fold, dest_fold, angle, dest_angle)
     # Make folder
     mkdir_p(xp_folder)
     print("\nSaving experiment data to:", xp_folder)
@@ -81,10 +90,12 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
     #############################
     
     # Dataset classes
+    gallery_list = "OULP/CV%s.txt_gallery_%s" % (dest_fold, dest_angle)
     gallery_data = ArrayData(gallery_list, nb_frames=nb_frames, augmenter=None, eager=eager, testing=True)
     print("Gallery size", gallery_data[0][0].shape)
     nb_gallery = len(gallery_data) # loader should provide the number of sampĺes
 
+    probe_list = "OULP/CV%s.txt_probe_%s" % (dest_fold, dest_angle)
     probe_data = ArrayData(probe_list, nb_frames=nb_frames, augmenter=None, eager=eager, encoder=gallery_data.get_encoder(), testing=True)
     print("Probe size", probe_data[0][0].shape)
     nb_probe = len(probe_data) # loader should provide the number of sampĺes
@@ -104,7 +115,7 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
     print("Model path", model_path)
 
     # Loading complete model and its weights
-    sym, arg_params, aux_params = mx.model.load_checkpoint(model_path, epoch)
+    sym, arg_params, aux_params = mx.model.load_checkpoint(os.path.join(ckpt_folder, model_path), epoch)
     all_layers = sym.get_internals() # feature layer
 
     # Get the feature layer output
@@ -118,7 +129,7 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
     # Feature extraction network
     sym3 = all_layers[layername]
     model = mx.mod.Module(symbol=sym3, label_names=None, context=mx.gpu())
-    model.bind(for_training=False, data_shapes=[('data', (1,1,64,44))])
+    model.bind(for_training=False, data_shapes=[('data', (1, 1, 64, 44))])
     model.set_params(arg_params, aux_params)
 
 
@@ -132,11 +143,13 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
     ###########
     # Testing #
     ###########
-    start_time = time()
-
     train_data = []
     train_labels = []
-    # calculate testing accuracy
+
+    # Time measurement
+    start_time = time()
+
+    # Compute "train" features
     for i in tqdm(range(nb_gallery), desc='Computing gallery features'):
         video, label = gallery_data[i]
 
@@ -154,6 +167,8 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
 
         train_data.append(preds)
         train_labels.append(label)
+    
+    gallery_time = time() - start_time
 
     train_data = np.vstack(train_data)
     train_labels = np.hstack(train_labels)
@@ -162,7 +177,9 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
 
     test_data = []
     test_labels = []
-    # calculate testing accuracy
+
+    start_probe = time()
+    # Compute "test" features
     for i in tqdm(range(nb_probe), desc='Computing probe features'):
         video, label = probe_data[i]
 
@@ -172,7 +189,7 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
 
         # They all have the same label
         nb_gei = data.shape[0]
-        label = np.repeat(label, nb_gei)
+        # label = np.repeat(label, nb_gei)
 
         # Compute outputs and accuracy
         model.forward(Batch([data]))
@@ -180,38 +197,76 @@ def main(gallery_list, probe_list, exp, ckpt_folder, batch_size, nb_frames, eage
 
         test_data.append(preds)
         test_labels.append(label)
+    
+    probe_time = time() - start_probe
 
-    test_data = np.vstack(test_data)
-    test_labels = np.hstack(test_labels)
+    test_data = np.array(test_data)
+    test_labels = np.array(test_labels)
 
     print("test_size", test_data.shape, test_labels.shape)
-
-
-    ##############################
-    # Fazer a moda das predições #
-    ##############################
     print()
+
+    # Nearest Neighbors
     nn_start = time()
-    nn = KNeighborsClassifier(1)
+    nn = KNeighborsClassifier(1, n_jobs=-1)
     nn.fit(train_data, train_labels)
     nn_fit = time()
-    preds = nn.predict(test_data)
+    
+    nn_preds = []
+    for sample in tqdm(test_data, desc="Nearest neighbors predictions"):
+        out = nn.predict(sample)
+        nn_preds.append(mode(out).mode[0])
+    nn_preds = np.array(nn_preds)
+
     nn_end = time()
 
-    nn_acc = accuracy_score(preds, test_labels)
-    print("NN accuracy:", nn_acc)
-    print("nn train", nn_fit - nn_start, ", nn_test", nn_end - nn_fit)
+    nn_fit_time = nn_fit - nn_start
+    nn_predict_time = nn_end - nn_fit
 
+    nn_acc = accuracy_score(nn_preds, test_labels)
+    print("NN accuracy:", nn_acc)
+    print("nn train", nn_fit_time, ", nn_test", nn_predict_time)
+    print()
+
+    # OPF
     opf_start = time()
     opf = OPFClassifier()
     opf.fit(train_data, train_labels)
     opf_fit = time()
-    preds = opf.predict(test_data)
+
+    opf_preds = []
+    for sample in tqdm(test_data, desc="OPF predictions"):
+        out = opf.predict(sample)
+        opf_preds.append(mode(out).mode[0])
+    opf_preds = np.array(opf_preds)
+
     opf_end = time()
 
-    opf_acc = accuracy_score(preds, test_labels)
+    opf_fit_time = opf_fit - opf_start
+    opf_predict_time = opf_end - opf_fit
+
+    opf_acc = accuracy_score(opf_preds, test_labels)
     print("OPF accuracy:", opf_acc)
-    print("opf train", opf_fit - opf_start, ", opf_test", opf_end - opf_fit)
+    print("opf train", opf_fit_time, ", opf_test", opf_predict_time)
+    print()
+
+
+    print("Saving experiment data")
+    np.save(os.path.join(xp_folder, 'gt.npy'), test_labels)
+    np.save(os.path.join(xp_folder, 'nn_preds.npy'), nn_preds)
+    np.save(os.path.join(xp_folder, 'opf_preds.npy'), opf_preds)
+
+    headers = ['gallery_time', 'probe_time', 'nn_fit_time', 'nn_predict_time', 'nn_acc', 'opf_fit_time', 'opf_predict_time', 'opf_acc']
+    info = [gallery_time, probe_time, nn_fit_time, nn_predict_time, nn_acc, opf_fit_time, opf_predict_time, opf_acc]
+    info = [str(i) for i in info]
+    csv_contents = ";".join(headers) + "\n" + ";".join(info)
+
+    with open(os.path.join(xp_folder, 'nn_acc'), 'w') as f:
+        f.write(str(nn_acc))
+    with open(os.path.join(xp_folder, 'opf_acc'), 'w') as f:
+        f.write(str(opf_acc))
+    with open(os.path.join(xp_folder, 'info.csv'), 'w') as f:
+        f.write(csv_contents)
 
     hours, rem = divmod(time()-start_time, 3600)
     days, hours = divmod(hours, 24)
