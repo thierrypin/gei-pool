@@ -141,6 +141,16 @@ class ResearchModels():
             net.add(nn.Conv2D(128, (3, 3), padding=(1, 1), activation='relu'))
             net.add(nn.Conv2D(128, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
             net.add(LRN())
+        
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(64, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
+            net.add(LRN())
+        
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), activation='relu'))
+            net.add(nn.Conv2D(32, (3, 3), padding=(1, 1), strides=(2, 2), activation='relu'))
+            net.add(LRN())
 
             net.add(nn.Dense(1024, activation='relu', prefix='feature_'))
             net.add(nn.Dropout(0.3))
