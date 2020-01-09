@@ -3,17 +3,15 @@
     "description": "Recogna's research model templates",
     "saved_model": {"default":null, "type":"str", "help":"Saved model location"},
 
-    "train_list": {"default":"OULP/CV01.txt_gallery_55", "type":"str", "help":"Path to list of training samples"},
-    "val_list": {"default":"OULP/CV01.txt_probe_55", "type":"str", "help":"Path to list of validation samples"},
-    "dest_fold": {"default":"02", "type":"str", "help":"Fold number to perform training/testing"},
-    "dest_angle": {"default":"55", "type":"str", "help":"Angle to perform cross validation"},
+    "train_list": {"default":"cancer/train", "type":"str", "help":"Path to list of training samples"},
+    "val_list": {"default":"cancer/validation", "type":"str", "help":"Path to list of validation samples"},
     "nb_frames": {"default":4, "type":"int", "help":"Number of frames on the time series"},
     "eager": {"default":"true", "type":"str2bool", "help":"If set, load all samples into memory"},
     "ckpt_folder": {"default":null, "type":"str", "help":"Checkpoint folder"},
 
     "train_all": {"default":"false", "type":"str2bool", "help":"If true, unlock all layers for training"},
 
-    "model": {"default":"lstm", "type":"str", "help":"Model name"},
+    "model": {"default":"efficientnet", "type":"str", "help":"Model name"},
     "batch_size": {"default":32, "type":"int", "help":"Training batch size"},
     "nb_epochs": {"default":50, "type":"int", "help":"Number of epochs"},
     "augment": {"default":"true", "type":"str2bool", "help":"Perform data augmentation"},
@@ -25,4 +23,3 @@
     "lr_momentum": {"default":"0.9", "type":"float", "help":"Learning rate momentum"}
 }
 
-z

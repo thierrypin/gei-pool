@@ -2,6 +2,7 @@ import os
 from math import isnan
 
 import operator
+from numbers import Number
 
 from mxboard import SummaryWriter
 
@@ -88,8 +89,9 @@ class TerminateOnNaN():
     
     # Return True to interrupt training
     def __call__(self, model, params):
-        if isnan(params['val_acc']) or isnan(params['acc']):
-            return True
+        for key in params.keys():
+            if isinstance(params[key], Number) and isnan(params[key]):
+                return True
 
 
 

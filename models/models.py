@@ -10,6 +10,7 @@ from mxnet import nd
 from mxnet.gluon import HybridBlock, nn
 from gluoncv.nn.feature import FeatureExtractor
 
+from models.efficientnet_model import EfficientNet
 
 
 class LRN(HybridBlock):
@@ -157,6 +158,12 @@ class ResearchModels():
 
             net.add(nn.Dense(self.nb_classes))
 
+        return net
+
+
+    # TODO Mudar a rede aqui
+    def efficientnet(self):
+        net = EfficientNet(classes=8)
         return net
 
 

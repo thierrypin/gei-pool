@@ -34,7 +34,7 @@ class Augmenter:
 def horizontal_flip(p=0.5):
     def fc(img):
         if random.random() < p:
-            return np.array(np.fliplr(img))
+            return img[..., ::-1]
         else:
             return img
     return fc
@@ -42,7 +42,7 @@ def horizontal_flip(p=0.5):
 def vertical_flip(p=0.5):
     def fc(img):
         if random.random() < p:
-            return np.array(np.flipud(img))
+            return img[..., ::-1, :]
         else:
             return img
     return fc
